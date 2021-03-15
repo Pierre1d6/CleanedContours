@@ -1,0 +1,26 @@
+##############################  Extracted using PyRadiomics version: 0.1  ######################################
+
+imageType:
+  Original: {}
+
+
+featureClass:
+  glcm:
+  glrlm:
+  glszm:
+
+
+setting:
+  # Normalization:
+  interpolator: 'sitkLinear'
+  resampledPixelSpacing: [2.0, 2.0, 2.0] #ne peux pas faire plusieurs resample en 1 run
+  binCount: 32
+  distances: [2]
+  padDistance: 5   # the number of voxels pad cropped tumor volume with during resampling. Padding occurs in new feature
+                   # space and is done on all faces, i.e. size increases in x, y and z direction by 2*padDistance.
+                   # Padding is needed for some filters (e.g. LoG).
+
+
+  # first order specific settings:
+  #voxelArrayShift: 1000  # Minimum value in HU is -1000, shift +1000 to prevent negative values from being squared.
+

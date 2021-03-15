@@ -1,0 +1,20 @@
+##############################  Extracted using PyRadiomics version: 0.1  ######################################
+
+imageType:
+  Original: {}
+
+
+featureClass:
+  glcm:
+  glrlm:
+  glszm:
+
+
+setting:
+  # Normalization:
+  interpolator: 'sitkLinear'
+  resampledPixelSpacing: [2.0, 2.0, 2.0]  #ne peux pas faire plusieurs resample en 1 run
+  binCount: 8
+  distances: [2]
+  padDistance: 5
+

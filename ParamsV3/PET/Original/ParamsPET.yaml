@@ -1,0 +1,17 @@
+##############################  Extracted using PyRadiomics version: 0.1  ######################################
+
+imageType:
+  Original: {}
+
+featureClass:
+  firstorder:
+
+setting:
+  # Normalization:
+  interpolator: 'sitkLinear'
+  resampledPixelSpacing: [2.0, 2.0, 2.0]  #ne peux pas faire plusieurs resample en 1 run
+
+
+  # first order specific settings:
+  #voxelArrayShift: 1000  # Minimum value in HU is -1000, shift +1000 to prevent negative values from being squared.
+

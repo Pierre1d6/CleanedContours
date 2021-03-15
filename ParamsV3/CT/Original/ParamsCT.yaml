@@ -1,0 +1,17 @@
+##############################  Extracted using PyRadiomics version: 0.1  ######################################
+
+imageType:
+  Original: {}
+
+
+featureClass:
+  firstorder:
+  shape:
+
+
+setting:
+  # Normalization:
+  interpolator: 'sitkLinear'
+  resampledPixelSpacing: [2.0, 2.0, 2.0]
+
+
