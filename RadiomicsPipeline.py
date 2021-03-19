@@ -1,22 +1,22 @@
-import numpy as np
-from sklearn.base import BaseEstimator, TransformerMixin
 import warnings
-import matplotlib.pyplot as plt
-from sklearn.exceptions import ConvergenceWarning
-from sklearn.pipeline import Pipeline, make_pipeline
-from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import RepeatedStratifiedKFold, StratifiedKFold, StratifiedShuffleSplit, KFold
-from sksurv.linear_model import CoxnetSurvivalAnalysis, CoxPHSurvivalAnalysis
-from sklearn.model_selection import GridSearchCV
-import pandas as pd
-from sklearn.decomposition import PCA
-from sksurv.ensemble import RandomSurvivalForest
-from sksurv.util import Surv
-import pingouin as pg
+
 import matplotlib as plt
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 from lifelines import KaplanMeierFitter
-from sksurv.metrics import concordance_index_censored
 from lifelines.statistics import logrank_test
+from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.exceptions import ConvergenceWarning
+from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import StratifiedKFold, StratifiedShuffleSplit
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+from sksurv.ensemble import RandomSurvivalForest
+from sksurv.linear_model import CoxPHSurvivalAnalysis
+from sksurv.metrics import concordance_index_censored
+import pingouin as pg
+
 
 
 class RemoveHighlyCorrelatedFeatures(BaseEstimator, TransformerMixin):
@@ -49,8 +49,6 @@ class StratifiedCustomKfold(StratifiedKFold):
 
 
 scaler = StandardScaler()
-# reg = CoxnetSurvivalAnalysis(l1_ratio=1, alpha_min_ratio=0.01, max_iter=1000)
-# alphas = np.linspace(0, 0.3, 50, endpoint=False)
 alphas = np.linspace(0, 0, 1)
 reg = CoxPHSurvivalAnalysis(n_iter=1000)
 
@@ -68,14 +66,9 @@ pipe = Pipeline(steps=[
     ('regressor', reg),
 ])
 T_OPTIONS = [0.6, 0.65, 0.70, 0.75, 0.80]
-#D_OPTIONS = [5, 10, 15]
-#N_OPTIONS = [5, 10, 15]
 param_grid = [
     {
-        'drop_features__threshold': T_OPTIONS,
-        # "regressor__alpha":0,#[[v] for v in alphas],
-        # "pca__n_components": D_OPTIONS,
-        # "feature_selection__n_features_to_select": N_OPTIONS
+        'drop_features__threshold': T_OPTIONS
     },
 ]
 
@@ -86,19 +79,21 @@ outputFileCindex = "SurvivalAnalysis/CindexRadiothyVsRadiomics.csv"
 outcome = 'DFS'
 time = "Time-DFS"
 
-inputFile = pd.read_csv(filePath, index_col=0,sep=";")
-inputFile2 = pd.read_csv(filePath2, index_col=0,sep=";")
-# X = inputFile.drop([outcome,time,"NumberNodules"],axis=1)
+inputFile = pd.read_csv(filePath, index_col=0, sep=";")
+inputFile2 = pd.read_csv(filePath2, index_col=0, sep=";")
+
 Xhecktor = inputFile
 y = Xhecktor.loc[:, [outcome, time]]
-Xhecktor = Xhecktor.iloc[:, 0:-2]  # [['ct_CT_original_shape_VoxelVolume']]
-# print(Xhecktor.columns)
-Xoriginal = inputFile2
-Xoriginal = Xoriginal.iloc[:, 0:-2]  # [['ct_CT_original_shape_VoxelVolume']]
-#Xoriginal.to_csv("ToutPatient.csv")
+Xhecktor = Xhecktor.iloc[:, 0:-2]
 
-n_iter = 100
+Xoriginal = inputFile2
+Xoriginal = Xoriginal.iloc[:, 0:-2]
+
+
+n_iter = 1
 iteration = 1
+computeKMcurve = False
+saveCindex = False
 rskf = StratifiedShuffleSplit(n_splits=n_iter, train_size=0.8, random_state=42)
 cv = StratifiedCustomKfold(n_splits=5, shuffle=True, random_state=42)
 
@@ -116,7 +111,8 @@ countRadiotherapy = np.zeros_like(Xhecktor.columns.to_list(), dtype=np.int8)
 countRadiomics = np.zeros_like(Xhecktor.columns.to_list(), dtype=np.int8)
 listiteration = []
 Testsamples = pd.DataFrame()
-# feature_names = X.iloc[:,0:-2].columns.tolist()
+
+
 for train_index, test_index in rskf.split(Xhecktor, y.loc[:, outcome]):
     print("Iteration n°: " + str(iteration))
     y[outcome] = y[outcome].astype(bool)
@@ -142,10 +138,8 @@ for train_index, test_index in rskf.split(Xhecktor, y.loc[:, outcome]):
     pval = []
     CI95 = []
 
-    for feature in X_trainH.columns.to_list():  # ["ct_CT_original_shape_Sphericity"]:
+    for feature in X_trainH.columns.to_list():
 
-        # print(feature)
-        # print(X_trainO.loc[:,feature])
         Cindexoriginal = concordance_index_censored(y_train.loc[:, outcome].astype('bool'), y_train.loc[:, time],
                                                     X_trainO.loc[:, feature])
         Cindexhecktor = concordance_index_censored(y_train.loc[:, outcome].astype('bool'), y_train.loc[:, time],
@@ -154,34 +148,22 @@ for train_index, test_index in rskf.split(Xhecktor, y.loc[:, outcome]):
         cindexlistoriginal.append(Cindexoriginal[0])
         cindexlisthecktor.append(Cindexhecktor[0])
 
-        # featureOrignal = X_trainO.loc[:,feature].reset_index().rename(columns={'index': 'Patient', feature:'Feature'})
-        # featureHecktor = X_trainH.loc[:,feature].reset_index().rename(columns = {'index': 'Patient',feature:'Feature'})
-        # featureOrignal.insert(0, 'Annotations', 'Radiotherapy')
-        # featureHecktor.insert(0, 'Annotations', 'Radiomics')
-        # data = pd.concat([featureOrignal,featureHecktor],ignore_index=True)
-        # icc = pg.intraclass_corr(data=data, targets='Patient', raters='Annotations',ratings='Feature')#.round(3)
-        # icc.set_index("Type",inplace=True)
-        # ICC.append(icc.loc['ICC3',"ICC"])
-        # pval.append(icc.loc['ICC3',"pval"])
-        # CI95.append(icc.loc['ICC3',"CI95%"])
+        #featureOrignal = X_trainO.loc[:,feature].reset_index().rename(columns={'index': 'Patient', feature:'Feature'})
+        #featureHecktor = X_trainH.loc[:,feature].reset_index().rename(columns = {'index': 'Patient',feature:'Feature'})
+        #featureOrignal.insert(0, 'Annotations', 'Radiotherapy')
+        #featureHecktor.insert(0, 'Annotations', 'Radiomics')
+        #data = pd.concat([featureOrignal,featureHecktor],ignore_index=True)
+        #icc = pg.intraclass_corr(data=data, targets='Patient', raters='Annotations',ratings='Feature')#.round(3)
+        #icc.set_index("Type",inplace=True)
+        #ICC.append(icc.loc['ICC3',"ICC"])
+        #pval.append(icc.loc['ICC3',"pval"])
+        #CI95.append(icc.loc['ICC3',"CI95%"])
 
         Cindexoriginal_shift.append(abs(Cindexoriginal[0] - 0.5))
         Cindexhecktor_shift.append(abs(Cindexhecktor[0] - 0.5))
 
-    # results = pd.DataFrame({"ICC3": ICC,"Cindex Radiotherapy": cindexlistoriginal, "Cindex Radiomics": cindexlisthecktor, "CindexRadiotherapyShift": Cindexoriginal_shift, "CindexRadiomicsShift": Cindexhecktor_shift},index=featurelist)
-    # results.to_csv("ICC3_274fts.csv")
-    # print(results)
-
-    results = pd.DataFrame({"Cindex Radiotherapy": cindexlistoriginal, "Cindex Radiomics": cindexlisthecktor,
-                            "CindexRadiotherapyShift": Cindexoriginal_shift,
-                            "CindexRadiomicsShift": Cindexhecktor_shift}, index=featurelist)
-    maskRadiotherapy = results.where(results['CindexRadiotherapyShift'] > 0.14, other=0)
-    maskRadiotherapy.where(maskRadiotherapy['CindexRadiotherapyShift'] == 0, other=1, inplace=True)
-    countRadiotherapy = countRadiotherapy + np.asarray(maskRadiotherapy['CindexRadiotherapyShift'])
-
-    maskRadiomics = results.where(results['CindexRadiomicsShift'] > 0.14, other=0)
-    maskRadiomics.where(maskRadiomics['CindexRadiomicsShift'] == 0, other=1, inplace=True)
-    countRadiomics = countRadiomics + np.asarray(maskRadiomics['CindexRadiomicsShift'])
+    #results = pd.DataFrame({"ICC3": ICC,"Cindex Radiotherapy": cindexlistoriginal, "Cindex Radiomics": cindexlisthecktor, "CindexRadiotherapyShift": Cindexoriginal_shift, "CindexRadiomicsShift": Cindexhecktor_shift},index=featurelist)
+    #results.to_csv("ICC3_274fts.csv")
 
     resultsheadFeatureRadiotherapy = pd.DataFrame(
         {"Cindex Radiotherapy shift": Cindexoriginal_shift, "Feature": featurelist})
@@ -190,7 +172,6 @@ for train_index, test_index in rskf.split(Xhecktor, y.loc[:, outcome]):
     resultsheadFeatureRadiotherapy.sort_values("Cindex Radiotherapy shift", inplace=True, ascending=False)
     resultsheadFeatureRadiomics.sort_values("Cindex Radiomics shift", inplace=True, ascending=False)
     head20Radiotherapy = resultsheadFeatureRadiotherapy.head(20)  # 20
-    # print(head20Radiotherapy)
     head20Radiomics = resultsheadFeatureRadiomics.head(20)  # 20
     ListFeatureRadiotherapy = head20Radiotherapy['Feature'].tolist()
     ListFeatureRadiomics = head20Radiomics['Feature'].tolist()
@@ -205,8 +186,7 @@ for train_index, test_index in rskf.split(Xhecktor, y.loc[:, outcome]):
 
     X_trainH = X_trainH[ListFeatureRadiomics]
     X_testH = X_testH[ListFeatureRadiomics]
-    # print(X_trainH)
-    # print(X_trainO)
+
     searchO.fit(X_trainO, y_traint)
     searchH.fit(X_trainH, y_traint)
 
@@ -232,12 +212,14 @@ for train_index, test_index in rskf.split(Xhecktor, y.loc[:, outcome]):
 
     y_testH['predicted score'] = predictedscoreH
     y_testH['group'] = pd.cut(y_testH['predicted score'],
-                             [np.min(y_testH["predicted score"].values), np.quantile(y_testH["predicted score"].values,0.5),
-                              np.max(y_testH["predicted score"].values)], labels=["infmed", "supmed"], right=True,
-                             include_lowest=True)
+                              [np.min(y_testH["predicted score"].values),
+                               np.quantile(y_testH["predicted score"].values, 0.5),
+                               np.max(y_testH["predicted score"].values)], labels=["infmed", "supmed"], right=True,
+                              include_lowest=True)
     y_testO['predicted score'] = predictedscoreO
     y_testO['group'] = pd.cut(y_testO['predicted score'],
-                              [np.min(y_testO["predicted score"].values), np.quantile(y_testO["predicted score"].values,0.5),
+                              [np.min(y_testO["predicted score"].values),
+                               np.quantile(y_testO["predicted score"].values, 0.5),
                                np.max(y_testO["predicted score"].values)], labels=["infmed", "supmed"], right=True,
                               include_lowest=True)
 
@@ -246,54 +228,36 @@ for train_index, test_index in rskf.split(Xhecktor, y.loc[:, outcome]):
     ixH = (groupsH == 'infmed')
     ixO = (groupsO == 'infmed')
 
-
     resultsH = logrank_test(y_testH["Time-DFS"][~ixH], y_testH["Time-DFS"][ixH], event_observed_A=y_testH["DFS"][~ixH],
-                           event_observed_B=y_testH["DFS"][ixH])
+                            event_observed_B=y_testH["DFS"][ixH])
     pvalH.append(resultsH.p_value)
     resultsO = logrank_test(y_testO["Time-DFS"][~ixO], y_testO["Time-DFS"][ixO], event_observed_A=y_testO["DFS"][~ixO],
                             event_observed_B=y_testO["DFS"][ixO])
     pvalO.append((resultsO.p_value))
-    #print("p-value = " + str(results.p_value))
 
-    #kmf = KaplanMeierFitter()
+    if computeKMcurve:
+        if iteration == 64:  # 63
+            kmf = KaplanMeierFitter()
+            kmf.fit(y_testH["Time-DFS"][~ixH], y_testH["DFS"][~ixH], label='SupMed')
+            ax = kmf.plot_survival_function(ci_show=True, show_censors=True)
 
-    #kmf.fit(y_test["Time-DFS"], y_test["DFS"])
-    #ax = kmf.plot_survival_function(ci_show=True, show_censors=True)
-    # kmf.fit(y_test["Time-DFS"][~ix], y_test["DFS"][~ix], label='SupMed')
-    # ax = kmf.plot_survival_function(ci_show=True,show_censors=True)
+            kmf.fit(y_testH["Time-DFS"][ixH], y_testH["DFS"][ixH], label='InfMed')
+            ax = kmf.plot_survival_function(ax=ax, ci_show=True, show_censors=True)
+            ax.set_ylim(0.45, 1)
+            ax.text(0, 0.5, "p-value = " + str(round(resultsH.p_value, 2)))
+            print(c_cindexTestH)
+            plt.pyplot.show()
+        elif iteration == 81:
+            kmf = KaplanMeierFitter()
+            kmf.fit(y_testO["Time-DFS"][~ixO], y_testO["DFS"][~ixO], label='SupMed')
+            ax = kmf.plot_survival_function(ci_show=True, show_censors=True)
 
-    # kmf.fit(y_test["Time-DFS"][ix], y_test["DFS"][ix], label='InfMed')
-    # ax = kmf.plot_survival_function(ax=ax,ci_show=True,show_censors=True)
-    #ax.set_ylim(0.45, 1)
-    #ax.text(0, 0.6, "p-value = " + str(round(results.p_value, 2)))
-    # plt.pyplot.show()
-
-    # print(CindexTestO)
-    # print(CindexTestH)
-    if iteration == 64: #63
-        kmf = KaplanMeierFitter()
-        kmf.fit(y_testH["Time-DFS"][~ixH], y_testH["DFS"][~ixH], label='SupMed')
-        ax = kmf.plot_survival_function(ci_show=True,show_censors=True)
-
-        kmf.fit(y_testH["Time-DFS"][ixH], y_testH["DFS"][ixH], label='InfMed')
-        ax = kmf.plot_survival_function(ax=ax, ci_show=True,show_censors=True)
-        ax.set_ylim(0.45, 1)
-        ax.text(0, 0.5, "p-value = " + str(round(resultsH.p_value, 2)))
-        print(c_cindexTestH)
-        plt.pyplot.show()
-    elif iteration == 81:
-        kmf = KaplanMeierFitter()
-        kmf.fit(y_testO["Time-DFS"][~ixO], y_testO["DFS"][~ixO], label='SupMed')
-        ax = kmf.plot_survival_function(ci_show=True,show_censors=True)
-
-        kmf.fit(y_testO["Time-DFS"][ixO], y_testO["DFS"][ixO], label='InfMed')
-        ax = kmf.plot_survival_function(ax=ax, ci_show=True,show_censors=True)
-        ax.set_ylim(0.45, 1)
-        ax.text(0, 0.5, "p-value = " + str(round(resultsO.p_value, 2)))
-        print(c_cindexTestO)
-        plt.pyplot.show()
-
-
+            kmf.fit(y_testO["Time-DFS"][ixO], y_testO["DFS"][ixO], label='InfMed')
+            ax = kmf.plot_survival_function(ax=ax, ci_show=True, show_censors=True)
+            ax.set_ylim(0.45, 1)
+            ax.text(0, 0.5, "p-value = " + str(round(resultsO.p_value, 2)))
+            print(c_cindexTestO)
+            plt.pyplot.show()
 
     iteration += 1
 
@@ -302,22 +266,12 @@ dfResults = pd.DataFrame({"Cindex_TrainVal_Radiotherapy": CindexTrainO, "Cindex_
                           "p-valueTest_Radiotherapy": pvalO, "PvalueTest_Radiomics": pvalH})
 dfBestparamsO = pd.DataFrame(Best_paramsO)
 dfBestparamsH = pd.DataFrame(Best_paramsH)
-# print(dfResults)
+
 print(np.mean(CindexTestO))
 print(np.mean(CindexTestH))
 dfResults = pd.concat([dfResults, dfBestparamsO, dfBestparamsH], axis=1)
-
-#resultsCount = pd.DataFrame({"CountRadiotherapy": countRadiotherapy, "CountRadiomics": countRadiomics},
-                            #index=featurelist)
-dfResults.to_csv(outputFileCindex)
-
-# resultsCount.to_csv(outputFile)
-
-# print(Testsamples)
-# Testsamples.columns=listiteration
-# print(Testsamples)
-# Testsamples.to_csv("ListTestSamples.csv")
-
+if saveCindex:
+    dfResults.to_csv(outputFileCindex)
 
 
 
